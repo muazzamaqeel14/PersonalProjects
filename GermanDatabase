@@ -1,0 +1,176 @@
+import os
+import openpyxl
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox
+
+def get_user_input():
+    german_word = input_word.get()
+    sentence = input_sentence.get()
+    return german_word, sentence
+
+def save_to_excel(file_path, data):
+    workbook = openpyxl.load_workbook(file_path)
+
+    # Select the first sheet (assuming it exists) or create a new one
+    sheet = workbook.active if workbook.sheetnames else workbook.create_sheet()
+
+    # Find the last row in the sheet to append the data
+    last_row = sheet.max_row + 1
+
+    # Insert the data into the sheet
+    for col, value in enumerate(data, start=1):
+        sheet.cell(row=last_row, column=col, value=value)
+
+    # Save the updated workbook
+    workbook.save(file_path)
+
+def delete_file_content():
+    # Ask for confirmation before deleting the file content
+    result = messagebox.askyesno("Confirmation", "Are you sure you want to delete everything from the file?")
+    if result:
+        # Clear the sheet content (except for the header row)
+        workbook = openpyxl.load_workbook(file_path)
+        sheet = workbook.active
+        for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row):
+            for cell in row:
+                cell.value = None
+        workbook.save(file_path)
+
+def select_folder():
+    global save_folder
+    folder_path = filedialog.askdirectory(title="Select Folder to Save Excel Files")
+    if folder_path:
+        save_folder = folder_path
+
+def select_word_type():
+    result = messagebox.askquestion("Select Word Type", "Is it a Verb?", icon='info')
+    return "Verb" if result == 'yes' else "Noun"
+
+def save_data(word_type):
+    word_type = select_word_type()
+    word, sentence = get_user_input()
+
+    # Check if both word and sentence are entered
+    if word and sentence:
+        # Save the data to the appropriate Excel file
+        file_name = "verbs.xlsx" if word_type == "Verb" else "nouns.xlsx"
+        file_path = os.path.join(save_folder, file_name)
+        save_to_excel(file_path, [word, sentence])
+
+        # Clear the entry fields
+        input_word.delete(0, tk.END)
+        input_sentence.delete(0, tk.END)
+
+        # Show success message
+        messagebox.showinfo("Success", "Data saved successfully!")
+    else:
+        # Show error message if fields are empty
+        messagebox.showerror("Error", "Please enter both word and sentence.")
+
+def next_word():
+    global current_row
+    if current_row < total_rows:
+        current_row += 1
+        show_word_sentence(current_row)
+
+def prev_word():
+    global current_row
+    if current_row > 2:  # Skip the header row
+        current_row -= 1
+        show_word_sentence(current_row)
+
+def show_word_sentence(row):
+    word = sheet.cell(row=row, column=2).value
+    sentence = sheet.cell(row=row, column=3).value
+
+    label_word.config(text="Word: " + word, font=("Arial", 18))
+    label_sentence.config(text="Sentence: " + sentence, font=("Arial", 16))
+
+if __name__ == "__main__":
+    file_name = "german_words.xlsx"
+    save_folder = os.path.expanduser("~")  # Set the default save folder to user's home directory
+
+    # Check if the file exists, if not, create a new one with a header
+    if not os.path.isfile(file_name):
+        workbook = openpyxl.Workbook()
+        workbook.active.append(["Number", "German Word", "Sentence"])
+        workbook.save(file_name)
+
+    # Initialize the GUI
+    root = tk.Tk()
+    root.title("German Words")
+
+    # Set the window size and position
+    window_width = 800
+    window_height = 600
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    x = (screen_width - window_width) // 2
+    y = (screen_height - window_height) // 2
+    root.geometry(f"{window_width}x{window_height}+{x}+{y}")
+
+    # Use a modern theme for ttk widgets
+    style = ttk.Style()
+    style.theme_use("clam")
+
+    # Create a frame to hold the main content
+    main_frame = ttk.Frame(root)
+    main_frame.pack(expand=True, fill=tk.BOTH, padx=20, pady=20)
+
+    # Create input fields
+    label_word_input = ttk.Label(main_frame, text="Enter German Word:", font=("Arial", 20))
+    label_word_input.pack()
+    input_word = ttk.Entry(main_frame, font=("Arial", 20))
+    input_word.pack()
+
+    label_sentence_input = ttk.Label(main_frame, text="Enter Sentence:", font=("Arial", 20))
+    label_sentence_input.pack()
+    input_sentence = ttk.Entry(main_frame, font=("Arial", 20))
+    input_sentence.pack()
+
+    # Create buttons
+    button_save = ttk.Button(main_frame, text="Save as Verb", command=lambda: save_data("Verb"))
+    button_save.pack
+
+    button_noun = ttk.Button(main_frame, text="Save as Noun", command=lambda: save_data("Noun"))
+    button_noun.pack()
+
+    button_next = ttk.Button(main_frame, text="Next Word", command=next_word)
+    button_next.pack()
+
+    button_prev = ttk.Button(main_frame, text="Previous Word", command=prev_word)
+    button_prev.pack()
+    
+    button_save = ttk.Button(main_frame, text="Save", command=save_data)
+    button_save.pack()
+
+
+    # New button for selecting folder to save Excel files
+    button_folder = ttk.Button(main_frame, text="Select Save Folder", command=select_folder)
+    button_folder.pack()
+
+    # Load the Excel data
+    workbook = openpyxl.load_workbook(file_name)
+    sheet = workbook.active
+    total_rows = sheet.max_row
+    current_row = 2  # Start from row 2 to skip the header row
+
+    # Create labels to display word and sentence
+    label_word = ttk.Label(main_frame, text="Word: ", font=("Arial", 18))
+    label_word.pack()
+    label_sentence = ttk.Label(main_frame, text="Sentence: ", font=("Arial", 16))
+    label_sentence.pack()
+
+    # Show the first word and sentence
+    show_word_sentence(current_row)
+
+    # Add padding to the labels
+    label_word.config(padding=(0, 10))
+    label_sentence.config(padding=(0, 10))
+
+    # Configure the labels to expand and fill the available space
+    label_word.pack(expand=True, fill=tk.BOTH)
+    label_sentence.pack(expand=True, fill=tk.BOTH)
+
+    # Run the main GUI loop
+    root.mainloop()
